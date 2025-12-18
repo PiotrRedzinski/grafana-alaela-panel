@@ -1,0 +1,23 @@
+{
+  "type": "panel",
+  "name": "AlaEla Panel UPDATED",
+  "id": "ala-ela-panel",
+  "info": {
+    "keywords": ["variable", "filter", "clickhouse", "include", "exclude"],
+    "description": "AlaEla Panel - Variable filtering with include/exclude modes and active/inactive states for ClickHouse",
+    "author": {
+      "name": "Your Name"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "version": "2.0.0",
+    "updated": "2025-12-18"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}
+

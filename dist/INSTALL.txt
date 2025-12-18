@@ -1,0 +1,26 @@
+AlaEla Panel - Quick Install for Linux
+=======================================
+
+1. COPY PLUGIN FILES
+--------------------
+sudo mkdir -p /var/lib/grafana/plugins/ala-ela-panel
+sudo cp -r * /var/lib/grafana/plugins/ala-ela-panel/
+
+
+2. ALLOW UNSIGNED PLUGIN
+-------------------------
+sudo nano /etc/grafana/grafana.ini
+
+Add this line in [plugins] section:
+allow_loading_unsigned_plugins = ala-ela-panel
+
+
+3. RESTART GRAFANA
+------------------
+sudo systemctl restart grafana-server
+
+
+4. VERIFY
+---------
+Open Grafana → Administration → Plugins → Search "AlaEla"
+
