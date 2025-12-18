@@ -40,16 +40,28 @@ Click on any variable label to open the filter configuration menu:
 
 3. **Copy the plugin:**
    ```bash
+   # Linux
+   sudo mkdir -p /var/lib/grafana/plugins/ala-ela-panel
+   sudo cp -r dist/* /var/lib/grafana/plugins/ala-ela-panel/
+   
    # Windows (run as Administrator)
    xcopy /E /I dist "C:\Program Files\GrafanaLabs\grafana\data\plugins\ala-ela-panel"
    
-   # Or create a symbolic link for development
-   mklink /D "C:\Program Files\GrafanaLabs\grafana\data\plugins\ala-ela-panel" "C:\Users\USER\projekty\grafana_plugin\dist"
+   # Or create a symbolic link for development (Linux)
+   sudo ln -s /path/to/grafana_plugin/dist /var/lib/grafana/plugins/ala-ela-panel
    ```
 
 4. **Configure Grafana for unsigned plugins:**
    
-   Edit `grafana.ini` (usually in `C:\Program Files\GrafanaLabs\grafana\conf\`):
+   ```bash
+   # Linux
+   sudo nano /etc/grafana/grafana.ini
+   
+   # Windows
+   # Edit: C:\Program Files\GrafanaLabs\grafana\conf\grafana.ini
+   ```
+   
+   Add this in the `[plugins]` section:
    ```ini
    [plugins]
    allow_loading_unsigned_plugins = ala-ela-panel
@@ -57,11 +69,15 @@ Click on any variable label to open the filter configuration menu:
 
 5. **Restart Grafana:**
    ```bash
+   # Linux (systemd)
+   sudo systemctl restart grafana-server
+   
+   # Or using service command
+   sudo service grafana-server restart
+   
    # Windows Service
    net stop grafana
    net start grafana
-   
-   # Or restart from Services manager
    ```
 
 6. **Verify installation:**
