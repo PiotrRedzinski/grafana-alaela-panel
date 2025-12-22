@@ -9,6 +9,7 @@ interface FilterMenuProps {
   onModeChange: (mode: FilterMode) => void;
   onActiveChange: (active: boolean) => void;
   onClose: () => void;
+  isAdHoc?: boolean;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -69,6 +70,7 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
   onModeChange,
   onActiveChange,
   onClose,
+  isAdHoc = false,
 }) => {
   const styles = useStyles2(getStyles);
 
@@ -116,18 +118,23 @@ export const FilterMenu: React.FC<FilterMenuProps> = ({
 
   return (
     <div className={styles.menu} data-filter-menu onClick={(e) => e.stopPropagation()}>
-      <div className={styles.section}>
-        <span className={styles.label}>Filter Mode</span>
-        <RadioButtonGroup
-          options={modeOptions}
-          value={filterState.mode}
-          onChange={handleModeChange}
-          size="sm"
-          fullWidth
-        />
-      </div>
+      {/* Hide Filter Mode section for Ad hoc filters */}
+      {!isAdHoc && (
+        <>
+          <div className={styles.section}>
+            <span className={styles.label}>Filter Mode</span>
+            <RadioButtonGroup
+              options={modeOptions}
+              value={filterState.mode}
+              onChange={handleModeChange}
+              size="sm"
+              fullWidth
+            />
+          </div>
 
-      <div className={styles.divider} />
+          <div className={styles.divider} />
+        </>
+      )}
 
       <div className={styles.section}>
         <div className={styles.activeRow}>

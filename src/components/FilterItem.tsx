@@ -13,6 +13,7 @@ interface FilterItemProps {
   compact: boolean;
   onModeChange: (mode: FilterMode) => void;
   onActiveChange: (active: boolean) => void;
+  isAdHoc?: boolean;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -148,6 +149,7 @@ export const FilterItem: React.FC<FilterItemProps> = ({
   compact,
   onModeChange,
   onActiveChange,
+  isAdHoc = false,
 }) => {
   const styles = useStyles2(getStyles);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -167,6 +169,10 @@ export const FilterItem: React.FC<FilterItemProps> = ({
   const remainingCount = currentValues.length - maxDisplayValues;
 
   const getModeTooltip = () => {
+    if (isAdHoc) {
+      const activeText = filterState.active ? 'Active' : 'Inactive';
+      return `Ad hoc filter · ${activeText} · Click to configure`;
+    }
     const modeText = filterState.mode === 'include' ? 'Including' : 'Excluding';
     const activeText = filterState.active ? 'Active' : 'Inactive';
     return `${modeText} · ${activeText} · Click to configure`;
@@ -194,15 +200,17 @@ export const FilterItem: React.FC<FilterItemProps> = ({
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && handleClick()}
       >
-        {/* Mode indicator */}
-        <span
-          className={cx(
-            styles.modeIndicator,
-            filterState.mode === 'include' ? styles.modeInclude : styles.modeExclude
-          )}
-        >
-          {filterState.mode === 'include' ? '=' : '≠'}
-        </span>
+        {/* Mode indicator - hide for ad hoc filters */}
+        {!isAdHoc && (
+          <span
+            className={cx(
+              styles.modeIndicator,
+              filterState.mode === 'include' ? styles.modeInclude : styles.modeExclude
+            )}
+          >
+            {filterState.mode === 'include' ? '=' : '≠'}
+          </span>
+        )}
 
         {/* Label */}
         {showLabel && (
@@ -256,6 +264,7 @@ export const FilterItem: React.FC<FilterItemProps> = ({
             onModeChange={onModeChange}
             onActiveChange={onActiveChange}
             onClose={handleMenuClose}
+            isAdHoc={isAdHoc}
           />
         )}
       </div>

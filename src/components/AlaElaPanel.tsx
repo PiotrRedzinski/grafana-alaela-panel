@@ -6,7 +6,7 @@ import { getTemplateSrv, locationService } from '@grafana/runtime';
 import { AlaElaPanelOptions } from '../types';
 import { useFilterState } from '../hooks/useFilterState';
 import { FilterItem } from './FilterItem';
-import { generateFilterClause } from '../utils/sqlGenerator';
+import { generateFilterClause, generateAdHocFilterClauses } from '../utils/sqlGenerator';
 
 interface Props extends PanelProps<AlaElaPanelOptions> {}
 
@@ -190,10 +190,37 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
 
   // Get all dashboard variables
   const allVariables = useMemo(() => {
-    return templateSrv.getVariables() as VariableModel[];
+    const vars = templateSrv.getVariables() as VariableModel[];
+    // Log ALL variables to see what types exist
+    console.log('[ALL VARIABLES]:', vars.map((v: any) => ({
+      name: v.name,
+      type: v.type,
+      allKeys: Object.keys(v)
+    })));
+    return vars;
   }, [templateSrv]);
 
-  // Filter to display variables
+  // Get Ad hoc filter variables separately - try multiple type variations
+  const adHocVariables = useMemo(() => {
+    const adhocVars = allVariables.filter((v) => {
+      const varAny = v as any;
+      const isAdhoc = varAny.type === 'adhoc' || 
+                      varAny.type === 'ad-hoc' || 
+                      varAny.type === 'adHoc' ||
+                      varAny.type === 'datasource';
+      
+      if (isAdhoc) {
+        console.log('[FOUND AD HOC VARIABLE]:', v.name, 'type:', varAny.type);
+      }
+      
+      return isAdhoc;
+    });
+    
+    console.log('[AD HOC VARIABLES COUNT]:', adhocVars.length);
+    return adhocVars;
+  }, [allVariables]);
+
+  // Filter to display variables (excluding adhoc for now, we'll handle them separately)
   const displayVariables = useMemo(() => {
     if (options.variableNames && options.variableNames.length > 0) {
       const varNames = typeof options.variableNames === 'string'
@@ -207,12 +234,66 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
 
   // State for variable values
   const [variableValues, setVariableValues] = useState<Record<string, string[]>>({});
+  
+  // State for ad hoc filter values - store as array of filter objects
+  const [adHocFilters, setAdHocFilters] = useState<Record<string, Array<{key: string, operator: string, value: string}>>>({});
 
   // Update function - always creates new object to force re-render
   const updateValues = useRef(() => {
     const newValues = getVariableValues(displayVariables);
     // Always create new object reference to ensure React detects change
     setVariableValues({ ...newValues });
+  });
+
+  // Update function for ad hoc filters - get fresh reference each time
+  const updateAdHocValues = useRef(() => {
+    const newAdHocValues: Record<string, Array<{key: string, operator: string, value: string}>> = {};
+    
+    // Get FRESH variable references from template service
+    const freshVariables = templateSrv.getVariables() as VariableModel[];
+    const freshAdHocVars = freshVariables.filter((v) => (v as any).type === 'adhoc');
+    
+    freshAdHocVars.forEach((v) => {
+      const varAny = v as any;
+      
+      // Log the ENTIRE variable structure to console
+      console.log(`[Ad hoc Full Dump] ${v.name}:`, varAny);
+      console.log(`[Ad hoc Keys] ${v.name}:`, Object.keys(varAny));
+      
+      // Check all possible locations
+      const filters = varAny.filters || [];
+      const currentFilters = varAny.current?.filters || [];
+      const stateFilters = varAny.state?.filters || [];
+      const optionFilters = varAny.options || [];
+      const queryFilters = varAny.query?.filters || [];
+      
+      console.log(`[Ad hoc Locations] ${v.name}:`, {
+        'filters': filters.length,
+        'filters array': filters,
+        'current?.filters': currentFilters.length,
+        'state?.filters': stateFilters.length,
+        'options': optionFilters.length,
+        'query?.filters': queryFilters.length,
+        'current': varAny.current,
+        'state': varAny.state
+      });
+      
+      // Use whichever has actual data
+      const actualFilters = filters.length > 0 ? filters : 
+                           currentFilters.length > 0 ? currentFilters : 
+                           stateFilters.length > 0 ? stateFilters :
+                           [];
+      
+      console.log(`[Ad hoc actualFilters] ${v.name}:`, actualFilters);
+      
+      newAdHocValues[v.name] = actualFilters.map((f: any) => ({
+        key: f.key,
+        operator: f.operator,
+        value: f.value
+      }));
+    });
+    
+    setAdHocFilters({ ...newAdHocValues });
   });
 
   // Update the ref when displayVariables changes
@@ -223,14 +304,63 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     };
   }, [displayVariables]);
 
-  // Very fast polling - 50ms
+  // Update the ref when adHocVariables changes
+  useEffect(() => {
+    updateAdHocValues.current = () => {
+      const newAdHocValues: Record<string, Array<{key: string, operator: string, value: string}>> = {};
+      
+      // Get FRESH variable references from template service
+      const freshVariables = templateSrv.getVariables() as VariableModel[];
+      const freshAdHocVars = freshVariables.filter((v) => (v as any).type === 'adhoc');
+      
+      freshAdHocVars.forEach((v) => {
+        const varAny = v as any;
+        
+        // Log the ENTIRE variable structure to console
+        console.log(`[Ad hoc Full Dump] ${v.name}:`, varAny);
+        console.log(`[Ad hoc Keys] ${v.name}:`, Object.keys(varAny));
+        
+        const filters = varAny.filters || [];
+        const currentFilters = varAny.current?.filters || [];
+        const stateFilters = varAny.state?.filters || [];
+        
+        console.log(`[Ad hoc Locations] ${v.name}:`, {
+          'filters': filters.length,
+          'filters array': filters,
+          'current?.filters': currentFilters.length,
+          'state?.filters': stateFilters.length,
+          'current': varAny.current,
+          'state': varAny.state
+        });
+        
+        const actualFilters = filters.length > 0 ? filters : 
+                             currentFilters.length > 0 ? currentFilters : 
+                             stateFilters.length > 0 ? stateFilters :
+                             [];
+        
+        console.log(`[Ad hoc actualFilters] ${v.name}:`, actualFilters);
+        
+        newAdHocValues[v.name] = actualFilters.map((f: any) => ({
+          key: f.key,
+          operator: f.operator,
+          value: f.value
+        }));
+      });
+      
+      setAdHocFilters({ ...newAdHocValues });
+    };
+  }, [templateSrv]);
+
+  // Very fast polling - 50ms for both regular and ad hoc variables
   useEffect(() => {
     // Initial update
     updateValues.current();
+    updateAdHocValues.current();
     
     // Poll every 50ms
     const intervalId = setInterval(() => {
       updateValues.current();
+      updateAdHocValues.current();
     }, 50);
     
     return () => clearInterval(intervalId);
@@ -239,7 +369,10 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
   // Also update on location/URL changes
   useEffect(() => {
     const unsubscribe = locationService.getHistory().listen(() => {
-      setTimeout(() => updateValues.current(), 10);
+      setTimeout(() => {
+        updateValues.current();
+        updateAdHocValues.current();
+      }, 10);
     });
     return unsubscribe;
   }, []);
@@ -247,47 +380,160 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
   // Update on data/time range changes
   useEffect(() => {
     updateValues.current();
+    updateAdHocValues.current();
   }, [data.series.length, timeRange]);
 
   // Generate SQL preview
   const sqlPreview = useMemo(() => {
-    if (displayVariables.length === 0) {
-      return '-- No variables configured';
-    }
-
-    const clauses = displayVariables.map((variable) => {
+    // Generate clauses from regular variables
+    const regularClauses = displayVariables.map((variable) => {
       const state = getFilterState(variable.name);
       const values = variableValues[variable.name] || [];
       return generateFilterClause(variable.name, values, state);
-    });
+    }).filter((c) => c !== '');
 
-    const nonEmptyClauses = clauses.filter((c) => c !== '');
+    // Generate clauses from ACTIVE Ad hoc filters only
+    const allAdHocFilters: Array<{ key: string; operator: string; value: string }> = [];
+    adHocVariables.forEach((v) => {
+      const state = getFilterState(v.name);
+      if (state.active) {
+        const filters = adHocFilters[v.name] || [];
+        allAdHocFilters.push(...filters);
+      }
+    });
     
-    if (nonEmptyClauses.length === 0) {
+    const adHocClausesStr = generateAdHocFilterClauses(allAdHocFilters);
+    const adHocClauses = adHocClausesStr ? adHocClausesStr.split('\n  ').filter(Boolean) : [];
+    
+    const allClauses = [...regularClauses, ...adHocClauses];
+    
+    if (displayVariables.length === 0 && adHocVariables.length === 0) {
+      return '-- No variables configured';
+    }
+    
+    if (allClauses.length === 0) {
       return '-- No active filters';
     }
 
-    return `-- Generated WHERE clauses:\n${nonEmptyClauses.join('\n')}`;
-  }, [displayVariables, getFilterState, variableValues]);
+    return `-- Generated WHERE clauses:\n${allClauses.join('\n')}`;
+  }, [displayVariables, adHocVariables, getFilterState, variableValues, adHocFilters]);
 
   // Copy-friendly SQL
   const copyableSql = useMemo(() => {
-    const clauses = displayVariables.map((variable) => {
+    // Regular variable clauses
+    const regularClauses = displayVariables.map((variable) => {
       const state = getFilterState(variable.name);
       const values = variableValues[variable.name] || [];
       return generateFilterClause(variable.name, values, state);
-    });
+    }).filter((c) => c !== '');
 
-    return clauses.filter((c) => c !== '').join('\n');
-  }, [displayVariables, getFilterState, variableValues]);
+    // ACTIVE Ad hoc filter clauses only
+    const allAdHocFilters: Array<{ key: string; operator: string; value: string }> = [];
+    adHocVariables.forEach((v) => {
+      const state = getFilterState(v.name);
+      if (state.active) {
+        const filters = adHocFilters[v.name] || [];
+        allAdHocFilters.push(...filters);
+      }
+    });
+    
+    const adHocClausesStr = generateAdHocFilterClauses(allAdHocFilters);
+    const adHocClauses = adHocClausesStr ? adHocClausesStr.split('\n  ').filter(Boolean) : [];
+
+    return [...regularClauses, ...adHocClauses].join('\n');
+  }, [displayVariables, adHocVariables, getFilterState, variableValues, adHocFilters]);
+
+  // Debug info for Ad hoc filters - use state values for real-time updates
+  // MUST be before early returns (React Hooks rules)
+  const adHocDebugInfo = useMemo(() => {
+    // Get fresh variables to show current state
+    const freshVariables = templateSrv.getVariables() as VariableModel[];
+    const freshAdHocVars = freshVariables.filter((v) => (v as any).type === 'adhoc');
+    
+    return freshAdHocVars.map((v) => {
+      const varAny = v as any;
+      const stateFilters = adHocFilters[v.name] || [];
+      
+      // Get all property keys for debugging
+      const allKeys = Object.keys(varAny);
+      const filters = varAny.filters || [];
+      const currentFilters = varAny.current?.filters || [];
+      const variableStateFilters = varAny.state?.filters || [];
+      
+      // Check current value structure
+      const currentValue = varAny.current?.value;
+      const currentText = varAny.current?.text;
+      
+      const hasFilters = filters.length;
+      const hasCurrentFilters = currentFilters.length;
+      const hasStateFilters = variableStateFilters.length;
+      
+      return {
+        name: v.name,
+        type: 'adhoc',
+        filterCount: stateFilters.length,
+        filters: stateFilters,
+        // Debug info
+        debugInfo: {
+          allKeys: allKeys.join(', '),
+          hasFilters,
+          hasCurrentFilters,
+          hasStateFilters,
+          currentValue: JSON.stringify(currentValue),
+          currentText: JSON.stringify(currentText),
+          filtersLocation: hasFilters > 0 ? 'filters' : 
+                          hasCurrentFilters > 0 ? 'current.filters' : 
+                          hasStateFilters > 0 ? 'state.filters' : 'NONE'
+        }
+      };
+    });
+  }, [adHocFilters, templateSrv]);
+
+  // Debug info - show what we're reading from Grafana
+  const debugInfo = useMemo(() => {
+    return displayVariables.map((v) => {
+      const varAny = v as any;
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlValue = urlParams.get(`var-${v.name}`);
+      const templateValue = templateSrv.replace(`$${v.name}`);
+      const currentValue = varAny.current?.value;
+      const panelValue = variableValues[v.name];
+      
+      return {
+        name: v.name,
+        type: varAny.type || 'unknown',
+        url: urlValue,
+        template: templateValue !== `$${v.name}` ? templateValue : 'N/A',
+        current: JSON.stringify(currentValue),
+        panel: JSON.stringify(panelValue)
+      };
+    });
+  }, [displayVariables, variableValues, templateSrv]);
 
   // Automatically update the alaela_sql variable in URL
   useEffect(() => {
-    const sqlClauses = displayVariables.map((variable) => {
+    // Generate regular variable clauses
+    const regularClauses = displayVariables.map((variable) => {
       const state = getFilterState(variable.name);
       const values = variableValues[variable.name] || [];
       return generateFilterClause(variable.name, values, state);
-    }).filter((c) => c !== '').join('\n');
+    }).filter((c) => c !== '');
+
+    // Generate ACTIVE Ad hoc filter clauses only
+    const allAdHocFilters: Array<{ key: string; operator: string; value: string }> = [];
+    adHocVariables.forEach((v) => {
+      const state = getFilterState(v.name);
+      if (state.active) {
+        const filters = adHocFilters[v.name] || [];
+        allAdHocFilters.push(...filters);
+      }
+    });
+    
+    const adHocClausesStr = generateAdHocFilterClauses(allAdHocFilters);
+    const adHocClauses = adHocClausesStr ? adHocClausesStr.split('\n  ').filter(Boolean) : [];
+
+    // Combine all clauses
+    const sqlClauses = [...regularClauses, ...adHocClauses].join('\n');
 
     // Update URL parameter (which Grafana treats as a variable value)
     // For Textbox/Custom variables, updating the URL param updates the variable
@@ -305,7 +551,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
         'var-alaela_sql': valueToSet,
       }, true);
     }
-  }, [displayVariables, getFilterState, variableValues]);
+  }, [displayVariables, adHocVariables, getFilterState, variableValues, adHocFilters]);
 
   if (displayVariables.length === 0) {
     return (
@@ -316,24 +562,6 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
       </div>
     );
   }
-
-  // Debug info - show what we're reading from Grafana
-  const debugInfo = displayVariables.map((v) => {
-    const varAny = v as any;
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlValue = urlParams.get(`var-${v.name}`);
-    const templateValue = templateSrv.replace(`$${v.name}`);
-    const currentValue = varAny.current?.value;
-    const panelValue = variableValues[v.name];
-    
-    return {
-      name: v.name,
-      url: urlValue,
-      template: templateValue !== `$${v.name}` ? templateValue : 'N/A',
-      current: JSON.stringify(currentValue),
-      panel: JSON.stringify(panelValue)
-    };
-  });
 
   return (
     <div className={cx(styles.container, options.compact && styles.compact)}>
@@ -354,7 +582,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
         <br/>
         Time: {new Date().toLocaleTimeString()}
         <br/>
-        Variables: {displayVariables.length}
+        Variables: {displayVariables.length} | Ad hoc Filters: {adHocVariables.length}
       </div>
       
       {/* Detailed debug info */}
@@ -365,24 +593,93 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
         borderRadius: '4px',
         marginBottom: '8px',
         fontFamily: 'monospace',
-        maxHeight: '150px',
+        maxHeight: '200px',
         overflow: 'auto'
       }}>
         <div style={{ color: '#ffa500', fontWeight: 'bold', marginBottom: '4px' }}>
           Detailed Debug - Last update: {new Date().toLocaleTimeString()}
         </div>
-        {debugInfo.map(info => (
-          <div key={info.name} style={{ color: '#aaa', marginBottom: '4px' }}>
-            <span style={{ color: '#4fc3f7' }}>{info.name}:</span>
-            <br/>
-            &nbsp;&nbsp;URL: {info.url || 'null'} | 
-            Template: {info.template} | 
-            Current: {info.current} | 
-            <span style={{ color: info.panel === JSON.stringify(info.url?.split(',')) ? '#4caf50' : '#f44336' }}>
-              Panel: {info.panel}
-            </span>
+        
+        {/* Regular variables */}
+        {debugInfo.length > 0 && (
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ color: '#90caf9', fontWeight: 'bold', marginBottom: '4px' }}>
+              Regular Variables ({debugInfo.length}):
+            </div>
+            {debugInfo.map(info => (
+              <div key={info.name} style={{ color: '#aaa', marginBottom: '4px' }}>
+                <span style={{ color: '#4fc3f7' }}>{info.name}</span> 
+                <span style={{ color: '#999' }}> ({info.type})</span>:
+                <br/>
+                &nbsp;&nbsp;URL: {info.url || 'null'} | 
+                Template: {info.template} | 
+                Current: {info.current} | 
+                <span style={{ color: info.panel === JSON.stringify(info.url?.split(',')) ? '#4caf50' : '#f44336' }}>
+                  Panel: {info.panel}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
+
+        {/* Ad hoc filters */}
+        {adHocDebugInfo.length > 0 && (
+          <div>
+            <div style={{ color: '#ff9800', fontWeight: 'bold', marginBottom: '4px' }}>
+              Ad Hoc Filters ({adHocDebugInfo.length}):
+            </div>
+            {adHocDebugInfo.map(info => (
+              <div key={info.name} style={{ color: '#aaa', marginBottom: '8px' }}>
+                <span style={{ color: '#ffb74d' }}>{info.name}</span>
+                <span style={{ color: '#999' }}> (adhoc)</span>:
+                <br/>
+                &nbsp;&nbsp;Filter count: <span style={{ color: info.filterCount > 0 ? '#4caf50' : '#f44336' }}>
+                  {info.filterCount}
+                </span>
+                <span style={{ color: '#666', fontSize: '8px', marginLeft: '8px' }}>
+                  (polled @ {new Date().toLocaleTimeString()})
+                </span>
+                <br/>
+                &nbsp;&nbsp;<span style={{ color: '#999', fontSize: '9px' }}>
+                  Keys: {info.debugInfo.allKeys}
+                </span>
+                <br/>
+                &nbsp;&nbsp;<span style={{ color: '#999', fontSize: '9px' }}>
+                  Filters location: <span style={{ color: info.debugInfo.filtersLocation !== 'NONE' ? '#4caf50' : '#f44336' }}>
+                    {info.debugInfo.filtersLocation}
+                  </span> ({info.debugInfo.hasFilters}/{info.debugInfo.hasCurrentFilters}/{info.debugInfo.hasStateFilters})
+                </span>
+                <br/>
+                &nbsp;&nbsp;<span style={{ color: '#999', fontSize: '9px' }}>
+                  current.value: {info.debugInfo.currentValue}
+                </span>
+                <br/>
+                &nbsp;&nbsp;<span style={{ color: '#999', fontSize: '9px' }}>
+                  current.text: {info.debugInfo.currentText}
+                </span>
+                <br/>
+                &nbsp;&nbsp;<span style={{ color: '#ffa500', fontSize: '9px', fontWeight: 'bold' }}>
+                  ⚠️ Check browser console for full object dump!
+                </span>
+                {info.filters.length > 0 && (
+                  <div style={{ marginLeft: '16px', marginTop: '4px' }}>
+                    {info.filters.map((filter: any, idx: number) => (
+                      <div key={idx} style={{ color: '#4caf50', fontSize: '10px', marginBottom: '2px' }}>
+                        [{idx + 1}] {filter.key} {filter.operator} &quot;{filter.value}&quot;
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {debugInfo.length === 0 && adHocDebugInfo.length === 0 && (
+          <div style={{ color: '#999', fontStyle: 'italic' }}>
+            No variables found
+          </div>
+        )}
       </div>
       
       <div
@@ -391,6 +688,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
           options.layout === 'horizontal' ? styles.filtersHorizontal : styles.filtersVertical
         )}
       >
+        {/* Regular Query variables */}
         {displayVariables.map((variable) => {
           const state = getFilterState(variable.name);
           const values = variableValues[variable.name] || [];
@@ -404,6 +702,28 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
               compact={options.compact}
               onModeChange={(mode) => setMode(variable.name, mode)}
               onActiveChange={(active) => setActive(variable.name, active)}
+              isAdHoc={false}
+            />
+          );
+        })}
+        
+        {/* Ad hoc filters */}
+        {adHocVariables.map((variable) => {
+          const state = getFilterState(variable.name);
+          const filters = adHocFilters[variable.name] || [];
+          // Display as formatted string showing all filters
+          const filterStrings = filters.map(f => `${f.key} ${f.operator} ${f.value}`);
+          return (
+            <FilterItem
+              key={variable.name}
+              variable={variable}
+              filterState={state}
+              currentValues={filterStrings}
+              showLabel={options.showLabels}
+              compact={options.compact}
+              onModeChange={(mode) => setMode(variable.name, mode)}
+              onActiveChange={(active) => setActive(variable.name, active)}
+              isAdHoc={true}
             />
           );
         })}

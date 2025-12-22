@@ -152,3 +152,53 @@ export function getFilterStateClass(state: FilterState): string {
   
   return classes.join(' ');
 }
+
+/**
+ * Map Grafana Ad hoc filter operators to SQL operators
+ * Handles special regex operators =~ and !~
+ */
+function mapAdHocOperatorToSQL(operator: string): string {
+  const operatorMap: Record<string, string> = {
+    '=': '=',
+    '!=': '!=',
+    '<': '<',
+    '>': '>',
+    '<=': '<=',
+    '>=': '>=',
+    '=~': 'LIKE',
+    '!~': 'NOT LIKE',
+  };
+  
+  return operatorMap[operator] || operator;
+}
+
+/**
+ * Generate SQL WHERE clause for a single Ad hoc filter
+ * 
+ * @param filter - Ad hoc filter object with key, operator, and value
+ * @returns SQL clause string (e.g., "AND column_name != 'value'")
+ */
+export function generateAdHocFilterClause(filter: { key: string; operator: string; value: string }): string {
+  const sqlOperator = mapAdHocOperatorToSQL(filter.operator);
+  const escapedValue = escapeClickHouseValue(filter.value);
+  
+  return `AND ${filter.key} ${sqlOperator} '${escapedValue}'`;
+}
+
+/**
+ * Generate all SQL WHERE clauses for Ad hoc filters
+ * 
+ * @param filters - Array of Ad hoc filter objects
+ * @returns Combined SQL WHERE clause fragments
+ */
+export function generateAdHocFilterClauses(
+  filters: Array<{ key: string; operator: string; value: string }>
+): string {
+  if (!filters || filters.length === 0) {
+    return '';
+  }
+  
+  return filters
+    .map((filter) => generateAdHocFilterClause(filter))
+    .join('\n  ');
+}
