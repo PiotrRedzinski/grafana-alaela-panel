@@ -11,6 +11,16 @@
 
 This document outlines the requirements for a Grafana panel/app plugin that enhances the default variable selector with advanced filtering capabilities. The plugin introduces a context menu for variables that allows users to toggle between positive/negative filtering and enable/disable filters dynamically, directly affecting ClickHouse SQL query generation.
 
+**Current Status:** Phase 1 MVP Complete + Enhanced Features Implemented
+- ✅ Query variables with Include/Exclude and Active/Inactive
+- ✅ Ad hoc filter support with operator mapping
+- ✅ FreeFilter textbox variable for custom SQL
+- ✅ BlockAll master switch for bulk filter control
+- ✅ Dev/Prod build system with tree-shaking
+- ✅ Custom "All" value support (None, All, $__all)
+- ✅ Multi-value variable handling
+- ✅ Real-time DEBUG PANEL (dev mode)
+
 ---
 
 ## 2. Problem Statement
@@ -33,15 +43,19 @@ This document outlines the requirements for a Grafana panel/app plugin that enha
 ## 3. Goals & Objectives
 
 ### Primary Goals
-1. Provide an intuitive menu-based interface for advanced variable filtering
-2. Enable positive (include) and negative (exclude) filtering modes
-3. Allow toggling filters on/off without losing selected values
-4. Dynamically modify SQL WHERE clauses based on filter state
+1. Provide an intuitive menu-based interface for advanced variable filtering ✅
+2. Enable positive (include) and negative (exclude) filtering modes ✅
+3. Allow toggling filters on/off without losing selected values ✅
+4. Dynamically modify SQL WHERE clauses based on filter state ✅
+5. Support Ad hoc filters with operator mapping ✅
+6. Enable custom SQL expressions via FreeFilter ✅
+7. Provide bulk filter control with BlockAll switch ✅
 
 ### Success Metrics
 - Reduced time for data exploration workflows by 50%
 - Zero manual query modifications needed for basic include/exclude operations
 - User satisfaction score > 4.5/5 for filtering UX
+- **Achieved:** 10x size reduction in production builds (231 KB → 21.7 KB)
 
 ---
 
@@ -446,6 +460,153 @@ LIMIT 1000
 - ✅ Works with any ClickHouse query panel
 - ✅ Updates in real-time when filters change
 
+### 8.4 Ad hoc Filter Support ✅ IMPLEMENTED
+
+**Variable Type:** Grafana Ad hoc Filters
+
+Ad hoc filters are natively supported with the following behavior:
+
+**Panel Integration:**
+- Automatically detected and displayed in the panel
+- Shows only **Active/Inactive** toggle (no Include/Exclude mode needed)
+- Ad hoc handles positive/negative filtering through its own operator selection
+
+**Operator Mapping:**
+| Grafana Operator | ClickHouse SQL |
+|------------------|----------------|
+| `=` | `=` |
+| `!=` | `!=` |
+| `<` | `<` |
+| `>` | `>` |
+| `=~` | `LIKE` |
+| `!~` | `NOT LIKE` |
+
+**SQL Generation:**
+```sql
+-- Ad hoc: key=destination_ip, operator==, value=10.0.0.200
+AND destination_ip = '10.0.0.200'
+
+-- Ad hoc: key=source_ip, operator==~, value=%192.168%
+AND source_ip LIKE '%192.168%'
+
+-- Ad hoc: key=cause, operator=!=, value=error
+AND cause != 'error'
+```
+
+**Real-time Updates:**
+- 50ms polling for Ad hoc filter changes
+- DEBUG PANEL shows filter details immediately
+- URL parameters updated automatically
+
+### 8.5 FreeFilter Variable ✅ IMPLEMENTED
+
+**Variable Type:** Textbox (must be named exactly "FreeFilter")
+
+Allows users to input raw SQL expressions that are wrapped with `AND (...)` or `AND NOT (...)` based on mode.
+
+**Requirements:**
+- Variable name must be **exactly** `FreeFilter` (case-sensitive)
+- Variable type must be **Textbox**
+- Only single-value input (multi-value is ignored)
+
+**SQL Generation:**
+
+| Mode | State | Input | Generated SQL |
+|------|-------|-------|---------------|
+| Include | Active | `status = 'ok' OR priority > 5` | `AND (status = 'ok' OR priority > 5)` |
+| Exclude | Active | `status = 'ok' OR priority > 5` | `AND NOT (status = 'ok' OR priority > 5)` |
+| Either | Inactive | Any | (no SQL clause) |
+| Include | Active | `v1,v2` (multi) | (no SQL clause) |
+
+**Use Cases:**
+- Complex conditions with OR logic
+- Subqueries or EXISTS clauses
+- Mathematical expressions
+- Date/time calculations
+
+**Example:**
+```sql
+-- FreeFilter input: "toHour(timedate) BETWEEN 9 AND 17"
+-- Generated: AND (toHour(timedate) BETWEEN 9 AND 17)
+```
+
+See `FREEFILTER.md` for detailed documentation.
+
+### 8.6 BlockAll Master Switch ✅ IMPLEMENTED
+
+A special control that allows users to temporarily deactivate all filters with one click, and restore them later.
+
+**Position:** First item in the panel filter list
+
+**Visual Design:**
+
+**OFF State (Default):**
+```
+[⚡ BlockAll ○] [= source_ip: ...] [= destination_ip: ...] ...
+```
+- Gray background (#2a2a2a)
+- Lightning bolt icon (⚡)
+- Toggle switch on left
+- Hover: Brightens
+
+**ON State (Blocking):**
+```
+[🚫 BlockAll ● 3] [≠ source_ip: ...] [≠ destination_ip: ...] ...
+```
+- Red background (#ff4444)
+- Block icon (🚫)
+- Toggle switch on right
+- Badge showing count of blocked filters
+- All other filters appear inactive (grayed out)
+
+**Behavior:**
+1. **Initially OFF**: All filters work normally
+2. **User clicks BlockAll** → Switch turns ON:
+   - Saves current active/inactive state of all filters
+   - Deactivates ALL filters (no SQL generated)
+   - Badge shows count of previously active filters
+3. **User clicks BlockAll again** → Switch turns OFF:
+   - Restores previously saved active states
+   - Filters that were active are reactivated
+
+**Independent Operation:**
+- Users can manually activate/deactivate individual filters while BlockAll is ON
+- BlockAll doesn't track these manual changes
+- When BlockAll is turned OFF, it only restores the original snapshot
+
+**State Management:**
+```typescript
+// State stored in component
+blockAllEnabled: boolean
+snapshotActiveFilters: Set<string>  // Names of filters that were active when BlockAll was turned ON
+```
+
+### 8.7 Custom "All" Value Support ✅ IMPLEMENTED
+
+The plugin recognizes multiple representations of "no filter" / "all values" and automatically skips SQL generation:
+
+**Supported Values:**
+- `$__all` (Grafana default)
+- `All` (common custom value)
+- `None` (custom all value)
+- Empty string `''`
+
+**Configuration:**
+In Grafana variable settings, under "Selection Options":
+- Enable "Include All option"
+- Set "Custom all value" to `None` (or leave default)
+
+**Behavior:**
+```sql
+-- When variable is set to "None", "All", or empty:
+-- (no SQL clause generated)
+
+-- When variable has actual values:
+WHERE column IN ('value1', 'value2')
+```
+
+This allows users to configure "None" as their "All" representation without generating invalid SQL like `AND column = 'None'`.
+
 ---
 
 ## 9. Implementation Phases
@@ -462,16 +623,23 @@ LIMIT 1000
 - [x] Copy filter state to clipboard
 - [x] Dynamic SQL updates on variable value changes
 
-### Phase 2: Enhanced Features (2-3 weeks)
+### Phase 2: Enhanced Features (2-3 weeks) ✅ COMPLETED
+- [x] Ad hoc filter support with Active/Inactive toggle
+- [x] Ad hoc operator mapping (=~ → LIKE, !~ → NOT LIKE)
+- [x] FreeFilter textbox variable for custom SQL expressions
+- [x] BlockAll master switch for bulk filter control
+- [x] Dev/Prod build system with conditional compilation
+- [x] DEBUG PANEL for development (real-time variable inspection)
+- [x] Custom "All" value support (None, All, $__all)
+- [x] Multi-value variable prioritization (Template > URL > Current)
+- [x] Real-time Ad hoc filter polling (50ms)
+
+### Phase 3: Polish & Advanced (Future)
 - [ ] Dashboard JSON persistence
 - [ ] Keyboard navigation
-- [ ] Bulk operations (disable all filters)
-
-### Phase 3: Polish & Advanced (2-3 weeks)
-- [ ] Bulk operations (disable all filters)
 - [ ] Filter presets/saved states
 - [ ] Dashboard variable migration tool
-- [ ] Documentation & examples
+- [ ] Comprehensive documentation & examples (partially complete)
 
 ---
 
@@ -573,6 +741,43 @@ ORDER BY timestamp DESC
 - [ClickHouse SQL Reference](https://clickhouse.com/docs/en/sql-reference)
 - [Grafana Variables Documentation](https://grafana.com/docs/grafana/latest/dashboards/variables/)
 
+### C. Build System ✅ IMPLEMENTED
+
+The plugin uses a dual-build system for development and production:
+
+**Build Configuration:**
+- `webpack.DefinePlugin` injects `__DEV__` constant
+- TypeScript global declaration: `declare const __DEV__: boolean`
+- Conditional compilation: `if (__DEV__) { ... }`
+- Tree-shaking removes debug code in production
+
+**Build Commands:**
+```bash
+npm run build:dev    # Dev build: __DEV__ = true
+npm run build:prod   # Prod build: __DEV__ = false
+npm run dev          # Watch mode (dev)
+```
+
+**Size Comparison:**
+- Dev: ~231 KB (includes DEBUG PANEL, console logs)
+- Prod: ~21.7 KB (10x smaller, debug code removed)
+
+**Debug Features (Dev Only):**
+- DEBUG PANEL with expandable sections
+- Variable value inspection (URL/Template/Current/Panel)
+- Ad hoc filter details
+- Console logging for all operations
+- Real-time filter count updates
+
+See `BUILD.md` for detailed documentation.
+
+### D. Additional Documentation
+
+- **README.md**: User-facing installation and usage guide
+- **BUILD.md**: Dev/Prod build instructions
+- **FREEFILTER.md**: FreeFilter variable feature documentation
+- **PRD.md**: This document - comprehensive product requirements
+
 ---
 
 **Document History**
@@ -580,4 +785,5 @@ ORDER BY timestamp DESC
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | Dec 18, 2025 | - | Initial draft |
+| 2.0 | Dec 27, 2025 | - | Updated with Phase 2 implementations: Ad hoc filters, FreeFilter, BlockAll, Dev/Prod builds, Custom "All" values |
 
