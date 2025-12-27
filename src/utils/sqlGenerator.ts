@@ -24,10 +24,10 @@ export function isAllOrEmpty(value: string | string[] | undefined): boolean {
       return true;
     }
     // Filter out special "all" values
-    const filtered = value.filter((v) => v && v !== '$__all' && v !== 'All' && v !== '');
+    const filtered = value.filter((v) => v && v !== '$__all' && v !== 'All' && v !== '' && v !== 'None');
     return filtered.length === 0;
   }
-  return value === '$__all' || value === 'All' || value === '';
+  return value === '$__all' || value === 'All' || value === '' || value === 'None';
 }
 
 /**
@@ -52,7 +52,7 @@ function normalizeToArray(value: string | string[] | undefined): string[] {
           // Split comma-separated values within array elements
           const split = v.split(',').map((s) => s.trim()).filter(Boolean);
           values.push(...split);
-        } else if (v !== '$__all' && v !== 'All' && v !== '') {
+        } else if (v !== '$__all' && v !== 'All' && v !== '' && v !== 'None') {
           values.push(v.trim());
         }
       }
@@ -63,14 +63,14 @@ function normalizeToArray(value: string | string[] | undefined): string[] {
     }
     if (value.includes(',')) {
       // Split comma-separated string
-      values = value.split(',').map((v) => v.trim()).filter((v) => v && v !== '$__all' && v !== 'All');
+      values = value.split(',').map((v) => v.trim()).filter((v) => v && v !== '$__all' && v !== 'All' && v !== 'None');
     } else {
       values = [value.trim()];
     }
   }
   
   // Remove duplicates and filter out empty/special values
-  return [...new Set(values)].filter((v) => v && v !== '$__all' && v !== 'All');
+  return [...new Set(values)].filter((v) => v && v !== '$__all' && v !== 'All' && v !== 'None');
 }
 
 /**
@@ -134,6 +134,57 @@ export function formatFilterDisplay(state: FilterState, value: string | string[]
   const prefix = state.mode === 'exclude' ? '≠ ' : '';
   const valueStr = Array.isArray(value) ? value.join(', ') : value;
   return `${prefix}${valueStr}`;
+}
+
+/**
+ * Generate SQL WHERE clause for FreeFilter (raw SQL expression)
+ * FreeFilter is special - it contains a complete SQL condition, not a column value
+ * 
+ * @param value - The SQL expression entered by user
+ * @param filterState - Current filter state
+ * @returns SQL clause string (e.g., "AND (expression)") or empty string
+ */
+export function generateFreeFilterClause(
+  value: string | string[] | undefined,
+  filterState: FilterState
+): string {
+  // If filter is not active, return empty string
+  if (!filterState.active) {
+    return '';
+  }
+
+  // Get the value as string
+  let sqlExpression = '';
+  
+  if (Array.isArray(value)) {
+    // If multiple values (comma-separated), no SQL generated
+    if (value.length > 1) {
+      return '';
+    }
+    // Single value in array
+    if (value.length === 1) {
+      sqlExpression = value[0].trim();
+    }
+  } else if (typeof value === 'string') {
+    // Check if it contains comma (multiple values)
+    if (value.includes(',')) {
+      return '';
+    }
+    sqlExpression = value.trim();
+  }
+  
+  // If no valid value, no filter needed
+  if (!sqlExpression || sqlExpression === '$__all' || sqlExpression === 'All' || sqlExpression === '') {
+    return '';
+  }
+
+  // Generate SQL based on mode
+  if (filterState.mode === 'include') {
+    return `AND (${sqlExpression})`;
+  } else {
+    // Exclude mode
+    return `AND NOT (${sqlExpression})`;
+  }
 }
 
 /**

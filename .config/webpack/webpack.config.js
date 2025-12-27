@@ -3,6 +3,7 @@ const ESLintPlugin = require('eslint-webpack-plugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const path = require('path');
 const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin');
+const webpack = require('webpack');
 
 const SOURCE_DIR = 'src';
 const DIST_DIR = 'dist';
@@ -44,6 +45,11 @@ module.exports = (env) => {
       },
     ],
     plugins: [
+      // Define global constants at compile time
+      new webpack.DefinePlugin({
+        __DEV__: JSON.stringify(isDev),
+        'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production'),
+      }),
       new CopyWebpackPlugin({
         patterns: [
           { from: '../README.md', to: '.', noErrorOnMissing: true },
