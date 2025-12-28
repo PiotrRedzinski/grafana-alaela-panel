@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { css, cx } from '@emotion/css';
 import { PanelProps, GrafanaTheme2, VariableModel } from '@grafana/data';
-import { useStyles2, Alert, ClipboardButton } from '@grafana/ui';
+import { useStyles2, Alert, ClipboardButton, Tooltip } from '@grafana/ui';
 import { getTemplateSrv, locationService } from '@grafana/runtime';
 import { AlaElaPanelOptions } from '../types';
 import { useFilterState } from '../hooks/useFilterState';
@@ -691,7 +691,40 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
   }
 
   return (
-    <div className={cx(styles.container, options.compact && styles.compact)}>
+    <div className={cx(styles.container, options.compact && styles.compact)} style={{ position: 'relative' }}>
+      {/* SQL Tooltip - Production only, compact view in top-right corner */}
+      {!__DEV__ && sqlPreview && (
+        <Tooltip content={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxWidth: '600px' }}>{sqlPreview}</pre>} placement="bottom-end">
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            padding: '4px 10px',
+            background: '#1f1f1f',
+            border: '1px solid #444',
+            borderRadius: '4px',
+            cursor: 'help',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            color: '#aaa',
+            zIndex: 1000,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#2a2a2a';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = '#666';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#1f1f1f';
+            e.currentTarget.style.color = '#aaa';
+            e.currentTarget.style.borderColor = '#444';
+          }}>
+            SQL
+          </div>
+        </Tooltip>
+      )}
+
       {/* DEBUG PANEL - Only shown in development builds */}
       {__DEV__ && (
         <>
@@ -943,7 +976,8 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
         })}
       </div>
 
-      {height > 150 && (
+      {/* SQL Preview Section - Only shown in development builds */}
+      {__DEV__ && height > 150 && (
         <div className={styles.sqlSection}>
           <div className={styles.sqlHeader}>
             <span className={styles.sqlLabel}>Generated SQL Clauses</span>
