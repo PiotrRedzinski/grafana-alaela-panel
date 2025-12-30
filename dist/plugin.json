@@ -1,6 +1,6 @@
 {
   "type": "panel",
-  "name": "AlaEla Panel UPDATED",
+  "name": "AlaEla Panel",
   "id": "ala-ela-panel",
   "info": {
     "keywords": ["variable", "filter", "clickhouse", "include", "exclude"],
@@ -12,7 +12,7 @@
       "small": "img/logo.svg",
       "large": "img/logo.svg"
     },
-    "version": "2.0.0",
+    "version": "1.0.0",
     "updated": "2025-12-18"
   },
   "dependencies": {

@@ -680,11 +680,11 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     }
   }, [blockAllEnabled, snapshotActiveFilters, displayVariables, adHocVariables, getFilterState, setActive]);
 
-  if (displayVariables.length === 0) {
+  if (displayVariables.length === 0 && adHocVariables.length === 0) {
     return (
       <div className={cx(styles.container, options.compact && styles.compact)}>
         <Alert title="No variables found" severity="info">
-          Add Query-type variables to your dashboard, or specify variable names in the panel options.
+          Add Query-type variables, Ad hoc filters, or FreeFilter (Textbox) to your dashboard.
         </Alert>
       </div>
     );
@@ -741,7 +741,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
             fontWeight: 'bold',
             textAlign: 'center'
           }}>
-            🔴 DEBUG PANEL v2.0 🔴
+            🔴 DEBUG PANEL v1.0 🔴
             <br/>
             Time: {new Date().toLocaleTimeString()}
             <br/>
