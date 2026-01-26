@@ -101,15 +101,29 @@ export function generateFilterClause(
 
   const operators = SQL_OPERATORS[filterState.mode];
   
+  // Special case: RespCause should not be quoted (for enum values)
+  const shouldQuote = columnName !== 'RespCause';
+  
   if (values.length === 1) {
     // Single value - use simple operator (= or !=)
-    const escapedValue = escapeClickHouseValue(values[0]);
-    return `AND ${columnName} ${operators.single} '${escapedValue}'`;
+    if (shouldQuote) {
+      const escapedValue = escapeClickHouseValue(values[0]);
+      return `AND ${columnName} ${operators.single} '${escapedValue}'`;
+    } else {
+      // No quotes for RespCause
+      return `AND ${columnName} ${operators.single} ${values[0]}`;
+    }
   }
   
   // Multiple values - use IN or NOT IN
-  const escapedValues = values.map((v) => `'${escapeClickHouseValue(v)}'`).join(', ');
-  return `AND ${columnName} ${operators.multi} (${escapedValues})`;
+  if (shouldQuote) {
+    const escapedValues = values.map((v) => `'${escapeClickHouseValue(v)}'`).join(', ');
+    return `AND ${columnName} ${operators.multi} (${escapedValues})`;
+  } else {
+    // No quotes for RespCause
+    const unquotedValues = values.join(', ');
+    return `AND ${columnName} ${operators.multi} (${unquotedValues})`;
+  }
 }
 
 /**

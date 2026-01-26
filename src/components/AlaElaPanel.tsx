@@ -118,7 +118,7 @@ function parseClickHouseFormat(value: string): string[] {
     const inner = trimmed.slice(1, -1); // Remove { and }
     const values = inner.split(',').map(v => v.trim()).filter(Boolean);
     if (__DEV__) {
-      console.log(`[ClickHouse Parser] Input: "${trimmed}" → Output:`, values);
+    console.log(`[ClickHouse Parser] Input: "${trimmed}" → Output:`, values);
     }
     return values;
   }
@@ -154,14 +154,14 @@ function getVariableValues(variables: VariableModel[]): Record<string, string[]>
           source = 'URL-override';
         }
       } else {
-        // Try parsing ClickHouse format {val1,val2}
-        const clickhouseValues = parseClickHouseFormat(replaced);
-        if (clickhouseValues.length > 0) {
-          extractedValues = clickhouseValues;
-          source = 'template-clickhouse';
-        } else {
-          extractedValues = normalizeToArray(replaced);
-          source = 'template';
+      // Try parsing ClickHouse format {val1,val2}
+      const clickhouseValues = parseClickHouseFormat(replaced);
+      if (clickhouseValues.length > 0) {
+        extractedValues = clickhouseValues;
+        source = 'template-clickhouse';
+      } else {
+        extractedValues = normalizeToArray(replaced);
+        source = 'template';
         }
       }
     }
@@ -175,9 +175,9 @@ function getVariableValues(variables: VariableModel[]): Record<string, string[]>
           extractedValues = [];
           source = 'URL-cleared';
         } else {
-          extractedValues = normalizeToArray(urlValue);
-          source = 'URL';
-        }
+        extractedValues = normalizeToArray(urlValue);
+        source = 'URL';
+      }
       }
     }
     
@@ -189,7 +189,7 @@ function getVariableValues(variables: VariableModel[]): Record<string, string[]>
         source = 'current-cleared';
       } else {
         extractedValues = normalizeToArray(currentVal);
-        source = 'current';
+      source = 'current';
       }
     }
     
@@ -205,7 +205,7 @@ function getVariableValues(variables: VariableModel[]): Record<string, string[]>
     }
     
     if (__DEV__) {
-      console.log(`[${timestamp}] ${variable.name}: ${JSON.stringify(extractedValues)} (from ${source})`);
+    console.log(`[${timestamp}] ${variable.name}: ${JSON.stringify(extractedValues)} (from ${source})`);
     }
     values[variable.name] = extractedValues;
   });
@@ -443,9 +443,9 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     const regularClauses = displayVariables
       .filter((variable) => variable.name !== 'FreeFilter')
       .map((variable) => {
-        const state = getFilterState(variable.name);
-        const values = variableValues[variable.name] || [];
-        return generateFilterClause(variable.name, values, state);
+      const state = getFilterState(variable.name);
+      const values = variableValues[variable.name] || [];
+      return generateFilterClause(variable.name, values, state);
       }).filter((c) => c !== '');
 
     // Generate FreeFilter clause (if exists)
@@ -454,7 +454,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
       ? [generateFreeFilterClause(variableValues['FreeFilter'], getFilterState('FreeFilter'))]
       : [];
     const filteredFreeFilterClauses = freeFilterClauses.filter((c) => c !== '');
-
+    
     // Generate clauses from ACTIVE Ad hoc filters only
     const allAdHocFilters: Array<{ key: string; operator: string; value: string }> = [];
     adHocVariables.forEach((v) => {
@@ -487,9 +487,9 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     const regularClauses = displayVariables
       .filter((variable) => variable.name !== 'FreeFilter')
       .map((variable) => {
-        const state = getFilterState(variable.name);
-        const values = variableValues[variable.name] || [];
-        return generateFilterClause(variable.name, values, state);
+      const state = getFilterState(variable.name);
+      const values = variableValues[variable.name] || [];
+      return generateFilterClause(variable.name, values, state);
       }).filter((c) => c !== '');
 
     // FreeFilter clause (if exists)
@@ -588,9 +588,9 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     const regularClauses = displayVariables
       .filter((variable) => variable.name !== 'FreeFilter')
       .map((variable) => {
-        const state = getFilterState(variable.name);
-        const values = variableValues[variable.name] || [];
-        return generateFilterClause(variable.name, values, state);
+      const state = getFilterState(variable.name);
+      const values = variableValues[variable.name] || [];
+      return generateFilterClause(variable.name, values, state);
       }).filter((c) => c !== '');
 
     // Generate FreeFilter clause (if exists)
@@ -624,7 +624,7 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
     // Only update if the SQL actually changed to avoid unnecessary URL updates
     if (currentSql !== sqlClauses) {
       if (__DEV__) {
-        console.log('[AlaEla] Updating alaela_sql variable:', sqlClauses);
+      console.log('[AlaEla] Updating alaela_sql variable:', sqlClauses);
       }
       
       // For empty SQL, set to a comment instead of null to keep the variable defined
@@ -728,39 +728,39 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
       {/* DEBUG PANEL - Only shown in development builds */}
       {__DEV__ && (
         <>
-          {/* HUGE DEBUG PANEL - VERSION 2.0 - IMPOSSIBLE TO MISS */}
-          <div style={{ 
-            fontSize: '16px', 
-            background: 'red', 
-            color: 'white',
-            padding: '20px', 
-            border: '5px solid yellow',
-            borderRadius: '4px',
-            marginBottom: '8px',
-            fontFamily: 'monospace',
-            fontWeight: 'bold',
-            textAlign: 'center'
-          }}>
+      {/* HUGE DEBUG PANEL - VERSION 2.0 - IMPOSSIBLE TO MISS */}
+      <div style={{ 
+        fontSize: '16px', 
+        background: 'red', 
+        color: 'white',
+        padding: '20px', 
+        border: '5px solid yellow',
+        borderRadius: '4px',
+        marginBottom: '8px',
+        fontFamily: 'monospace',
+        fontWeight: 'bold',
+        textAlign: 'center'
+      }}>
             🔴 DEBUG PANEL v1.0 🔴
-            <br/>
-            Time: {new Date().toLocaleTimeString()}
-            <br/>
+        <br/>
+        Time: {new Date().toLocaleTimeString()}
+        <br/>
             Variables: {displayVariables.length} | Ad hoc Filters: {adHocVariables.length}
-          </div>
-          
-          {/* Detailed debug info */}
-          <div style={{ 
-            fontSize: '11px', 
-            background: '#2a2a2a', 
-            padding: '8px', 
-            borderRadius: '4px',
-            marginBottom: '8px',
-            fontFamily: 'monospace',
+      </div>
+      
+      {/* Detailed debug info */}
+      <div style={{ 
+        fontSize: '11px', 
+        background: '#2a2a2a', 
+        padding: '8px', 
+        borderRadius: '4px',
+        marginBottom: '8px',
+        fontFamily: 'monospace',
             maxHeight: '200px',
-            overflow: 'auto'
-          }}>
-            <div style={{ color: '#ffa500', fontWeight: 'bold', marginBottom: '4px' }}>
-              Detailed Debug - Last update: {new Date().toLocaleTimeString()}
+        overflow: 'auto'
+      }}>
+        <div style={{ color: '#ffa500', fontWeight: 'bold', marginBottom: '4px' }}>
+          Detailed Debug - Last update: {new Date().toLocaleTimeString()}
             </div>
             
             {/* Regular variables */}
@@ -768,21 +768,21 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ color: '#90caf9', fontWeight: 'bold', marginBottom: '4px' }}>
                   Regular Variables ({debugInfo.length}):
-                </div>
-                {debugInfo.map(info => (
-                  <div key={info.name} style={{ color: '#aaa', marginBottom: '4px' }}>
+        </div>
+        {debugInfo.map(info => (
+          <div key={info.name} style={{ color: '#aaa', marginBottom: '4px' }}>
                     <span style={{ color: '#4fc3f7' }}>{info.name}</span> 
                     <span style={{ color: '#999' }}> ({info.type})</span>:
-                    <br/>
-                    &nbsp;&nbsp;URL: {info.url || 'null'} | 
-                    Template: {info.template} | 
-                    Current: {info.current} | 
-                    <span style={{ color: info.panel === JSON.stringify(info.url?.split(',')) ? '#4caf50' : '#f44336' }}>
-                      Panel: {info.panel}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <br/>
+            &nbsp;&nbsp;URL: {info.url || 'null'} | 
+            Template: {info.template} | 
+            Current: {info.current} | 
+            <span style={{ color: info.panel === JSON.stringify(info.url?.split(',')) ? '#4caf50' : '#f44336' }}>
+              Panel: {info.panel}
+            </span>
+          </div>
+        ))}
+      </div>
             )}
 
             {/* Ad hoc filters */}

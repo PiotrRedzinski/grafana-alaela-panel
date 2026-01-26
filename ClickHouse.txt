@@ -1,0 +1,4 @@
+ClickHouse
+
+clickhouse jest zainstalowany jako wsl ubuntu
+trzeba wpisać ws - i już się pojawia
