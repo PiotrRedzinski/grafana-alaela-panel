@@ -239,6 +239,11 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
   // Get Ad hoc filter variables separately - try multiple type variations
   const adHocVariables = useMemo(() => {
     const adhocVars = allVariables.filter((v) => {
+      // Skip variables starting with "x_"
+      if (v.name.startsWith('x_')) {
+        return false;
+      }
+      
       const varAny = v as any;
       const isAdhoc = varAny.type === 'adhoc' || 
                       varAny.type === 'ad-hoc' || 
@@ -265,10 +270,21 @@ export const AlaElaPanel: React.FC<Props> = ({ options, width, height, data, tim
         ? (options.variableNames as string).split(',').map((n) => n.trim()).filter(Boolean)
         : options.variableNames;
       
-      return allVariables.filter((v) => varNames.includes(v.name));
+      return allVariables.filter((v) => {
+        // Skip variables starting with "x_"
+        if (v.name.startsWith('x_')) {
+          return false;
+        }
+        return varNames.includes(v.name);
+      });
     }
     // Include Query variables AND Textbox variable named "FreeFilter"
+    // Exclude any variable starting with "x_"
     return allVariables.filter((v) => {
+      // Skip variables starting with "x_"
+      if (v.name.startsWith('x_')) {
+        return false;
+      }
       const varAny = v as any;
       return varAny.type === 'query' || (varAny.type === 'textbox' && v.name === 'FreeFilter');
     });
